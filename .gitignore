@@ -11,3 +11,4 @@
 *.out
 
 # DataBase File for now
+*.db
