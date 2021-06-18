@@ -1,7 +1,7 @@
 package main
 
 import (
-	"database/sql"
+	// "database/sql"
 	"log"
 
 	// "os"
@@ -9,54 +9,65 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 //Create Table
-func createTable(db *sql.DB) {
+func createTable()(error) {
 	log.SetFlags(0)
 
 	// Roll Number Should Be unique.
 	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( rollno INT PRIMARY KEY,name TEXT)")
 
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 
 	log.Println("Create Student table....")
 	createStatement.Exec()
 	log.Println("Student table Created Succesfully.")
+
+	return nil
 }
 
 // Add New Users
-func addUser(db *sql.DB, rollno int, name string) {
+func addUser(rollno int, name string)(error) {
 
 	// Add New User
 	addStatement, err := db.Prepare("INSERT INTO students ( rollno , name ) VALUES(?,?)")
 	if err != nil {
-		log.Fatalln("adding failed:", err)
+		log.Println("Error preparing Statement")
+		return err
 	}
 	log.Println("Add New User....")
 	_, err = addStatement.Exec(rollno, name)
 
 	// Unique Constrain on rollno
 	if err != nil {
-		log.Println("Cannot Add User:", err)
+		log.Println("Unable to Add user")
+		return err
 	} else {
 		log.Println("Succesfully Added New User.")
 	}
+
+	// testing purpose
+	displayStudents()
+
+	return nil
 }
 
 // Display Student
-func displayStudents(db *sql.DB) {
+func displayStudents()(error) {
 
 	displayStatement, err := db.Prepare("SELECT * FROM students ORDER BY name")
 
 	if err != nil {
-		log.Fatalln("displayStudents:", err)
+		log.Println("Error preparing db Statement")
+		return err
 	}
 	// TODO: Learn More
 	defer displayStatement.Close()
 	row, err := displayStatement.Query()
 
 	if err != nil {
-		log.Fatalln("displayStudents:", err)
+		log.Println("Error Displaying Students")
+		return err
 	}
 	// TODO: Learn More
 	defer row.Close()
@@ -71,6 +82,9 @@ func displayStudents(db *sql.DB) {
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)
 	if err = row.Err(); err != nil {
-		log.Fatalln("displayStudents:", err)
+		log.Println("Error While reading rows")
+		return err
 	}
+
+	return nil
 }

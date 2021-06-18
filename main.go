@@ -9,30 +9,38 @@ package main
 import (
 	"database/sql"
 	"log"
-	"os"
+	// "os"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// ? Standard Practice
+// Global access to database
+var db *sql.DB
+var err error
+
 func main() {
 	//For testing purpose only
-	os.Remove("students.db")
+	// os.Remove("students.db")
 	//Create Database
-	db, err := sql.Open("sqlite3", "./students.db")
+	db, err = sql.Open("sqlite3", "./students.db")
 	if err != nil{
 		log.Fatal(err)
 	}
 	// TODO: Learn why you need this
 	defer db.Close()
 	//Create table
-	createTable(db)
+	createTable()
 	// Update database
-	addUser(db, 190017, "Abhay Mishra")
-	addUser(db,190195,"Ashok kumar Saini")
-	addUser(db,190017,"Abhay")
-	addUser(db,190064,"Gaurav Sharma")
-	addUser(db,190034,"Hello world")
+	// addUser(db, 190017, "Abhay Mishra")
+	// addUser(db,190195,"Ashok kumar Saini")
+	// addUser(db,190017,"Abhay")
+	// addUser(db,190064,"Gaurav Sharma")
+	// addUser(db,190034,"Hello world")
 
 	// Display Users
-	displayStudents(db)
+	displayStudents()
+
+	// Start Server
+	startServer()
 }
