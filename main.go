@@ -9,7 +9,7 @@ package main
 import (
 	"database/sql"
 	"log"
-	// "os"
+	"os"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -21,7 +21,7 @@ var err error
 
 func main() {
 	//For testing purpose only
-	// os.Remove("students.db")
+	os.Remove("students.db")
 	//Create Database
 	db, err = sql.Open("sqlite3", "./students.db")
 	if err != nil{

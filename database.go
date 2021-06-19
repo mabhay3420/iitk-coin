@@ -7,8 +7,11 @@ import (
 	// "os"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
+	"golang.org/x/crypto/bcrypt"
 )
 
+
+// TODO : Use Structs : Change the functions accordingly.
 //Create Table
 func createTable() error {
 	log.SetFlags(0)
@@ -37,7 +40,13 @@ func addUser(rollno int, name string, password string) error {
 		return err
 	}
 	log.Println("Add New User....")
-	_, err = addStatement.Exec(rollno, name, 0, password)
+	bytes,err := bcrypt.GenerateFromPassword([]byte(password),14)
+
+	if(err!=nil){
+		log.Println("Error while hashing the password")
+		return err
+	}
+	_, err = addStatement.Exec(rollno, name, 0, string(bytes))
 
 	// Unique Constrain on rollno
 	if err != nil {
@@ -51,6 +60,36 @@ func addUser(rollno int, name string, password string) error {
 	displayStudents()
 
 	return nil
+}
+
+
+func getUserInfo(rollno int,password string)(string,int,error){
+	var name string
+	var coin int
+	var err error
+	var userPass string
+
+	getUserStatement,err := db.Prepare("SELECT * FROM students WHERE rollno=?")
+	if err != nil {
+		log.Println("Error preparing db Statement")
+		return name,coin,err
+	}
+	defer getUserStatement.Close()
+
+	err = getUserStatement.QueryRow(rollno).Scan(&rollno,&name,&coin, &userPass)
+
+	// If no such row exists(Both rollno and password should match) Scan will throw an error.
+	if(err != nil){
+		log.Println("Error while getting user Information.")
+		return name,coin,err
+	}
+	err = bcrypt.CompareHashAndPassword([]byte(userPass),[]byte(password))
+
+	if(err != nil){
+		return name,coin,err
+	}
+	//else return proper values
+	return name,coin,err
 }
 
 // Display Student

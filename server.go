@@ -31,23 +31,71 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// TODO : Learn More about Methods
 	// Valid Methods
-	if (r.Method != "POST") && (r.Method != "GET") {
-		http.Error(w, "Method is not Supported.", http.StatusNotFound)
+	// if (r.Method != "POST" && r.Method != "GET") {
+	// 	http.Error(w, "Method is not Supported.", http.StatusMethodNotAllowed)
+	// 	fmt.Println("Invlid Method")
+	// 	// Error method does not necessarly close the request. Need to return.
+	// 	return
+	// }
+
+	if(r.Method == "GET"){
+		w.WriteHeader(200)
+		fmt.Fprint(w, "Hello This is login Endpoint\n")
 		return
 	}
 
+	// Verify user
 
-	// Do Something
-	fmt.Fprint(w, "Hello This is login Endpoint\n")
+	if err:= r.ParseForm();err != nil{
+		http.Error(w,"Invalid Input to the form",http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	rollno := r.FormValue("rollno")
+	password := r.FormValue("password")
+
+	if(rollno =="" || password==""){
+		http.Error(w,"Roll No/Password Cannot be empty",http.StatusBadRequest)
+		fmt.Println("Empty password/rollno")
+		return
+	}
+
+	roll_int,err := strconv.Atoi(rollno)
+
+	//? Shouldn't we use Errors which signify what went wrong.
+	if err != nil{
+		http.Error(w,"Roll number must be integer\n",http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	name,coin,err := getUserInfo(roll_int,password)
+
+	if(err != nil){
+		http.Error(w, "Invalid User Rollno/Password Combination", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	w.WriteHeader(200)
+	fmt.Fprint(w,"Hii ",name,"! Welcome\nYour Current Balance is ",coin," Coins\n")
+	fmt.Println("Login of",name,"Succesful")
+
+	// Compare with database Password.
+
+
+
+
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
 	// Correct Endpoint
-	if r.URL.Path != "/signup" {
-		http.Error(w, "404 Not found.", http.StatusNotFound)
-		fmt.Println("Invalid Endpoint")
-		return
-	}
+	// if r.URL.Path != "/signup" {
+	// 	http.Error(w, "404 Not found.", http.StatusNotFound)
+	// 	fmt.Println("Invalid Endpoint")
+	// 	return
+	// }
 
 	// TODO : Learn More about Methods
 	// Valid Methods
