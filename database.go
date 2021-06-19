@@ -8,12 +8,13 @@ import (
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
 )
+
 //Create Table
-func createTable()(error) {
+func createTable() error {
 	log.SetFlags(0)
 
 	// Roll Number Should Be unique.
-	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( rollno INT PRIMARY KEY,name TEXT)")
+	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( rollno INTEGER PRIMARY KEY NOT NULL,name TEXT NOT NULL,coins INTEGER NOT NULL,password TEXT NOT NULL)")
 
 	if err != nil {
 		return err
@@ -27,16 +28,16 @@ func createTable()(error) {
 }
 
 // Add New Users
-func addUser(rollno int, name string)(error) {
+func addUser(rollno int, name string, password string) error {
 
 	// Add New User
-	addStatement, err := db.Prepare("INSERT INTO students ( rollno , name ) VALUES(?,?)")
+	addStatement, err := db.Prepare("INSERT INTO students ( rollno , name , coins,password) VALUES(?,?,?,?)")
 	if err != nil {
 		log.Println("Error preparing Statement")
 		return err
 	}
 	log.Println("Add New User....")
-	_, err = addStatement.Exec(rollno, name)
+	_, err = addStatement.Exec(rollno, name, 0, password)
 
 	// Unique Constrain on rollno
 	if err != nil {
@@ -53,7 +54,7 @@ func addUser(rollno int, name string)(error) {
 }
 
 // Display Student
-func displayStudents()(error) {
+func displayStudents() error {
 
 	displayStatement, err := db.Prepare("SELECT * FROM students ORDER BY name")
 
@@ -74,10 +75,12 @@ func displayStudents()(error) {
 	for row.Next() {
 		var rollno int
 		var name string
+		var coins int
+		var password string
 
-		row.Scan(&rollno, &name)
+		row.Scan(&rollno, &name, &coins, &password)
 
-		log.Println("RollNo:", rollno, "Name:", name)
+		log.Println("RollNo:", rollno, "Name:", name, "Coins:", coins, "Password:", password)
 	}
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)

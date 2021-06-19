@@ -32,15 +32,15 @@ func main() {
 	//Create table
 	createTable()
 	// Update database
-	// addUser(db, 190017, "Abhay Mishra")
-	// addUser(db,190195,"Ashok kumar Saini")
-	// addUser(db,190017,"Abhay")
-	// addUser(db,190064,"Gaurav Sharma")
-	// addUser(db,190034,"Hello world")
-
-	// Display Users
-	displayStudents()
+	// addUser( 190017, "Abhay Mishra","abcd")
+	// addUser(190195,"Ashok kumar Saini","efgh")
+	// addUser(190017,"Abhay","hello")
+	// addUser(190064,"Gaurav Sharma","nice")
+	// addUser(190034,"Hello world","cool")
 
 	// Start Server
 	startServer()
+
+	// Display Users
+	displayStudents()
 }

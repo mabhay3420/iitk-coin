@@ -75,6 +75,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	// get fields from request
 	rollno := r.FormValue("rollno")
 	name := r.FormValue("name")
+	password := r.FormValue("password")
 
 	// testing purpose
 
@@ -88,11 +89,18 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	err = addUser(roll_int,name)
+
+	if(password == "" || name==""){
+		http.Error(w, "User Name/Password Can not be empty", http.StatusBadRequest)
+		fmt.Println("User Name/Password empty")
+		return
+	}
+	// Adding new user
+	err = addUser(roll_int,name,password)
 
 	if(err != nil){
 		http.Error(w, "Invalid User Name/Password or User Already Exists", http.StatusBadRequest)
-		fmt.Println(err)
+		fmt.Println("Invalid Request, DB error:",err)
 		return
 	}
 
@@ -112,7 +120,7 @@ func homeHandler(w http.ResponseWriter,r *http.Request){
 
 	// TODO : Learn More about Methods
 	// Valid Methods
-	if (r.Method != "POST" && r.Method != "GET") {
+	if ( r.Method != "GET") {
 		http.Error(w, "Method is not Supported.", http.StatusMethodNotAllowed)
 		fmt.Println("Invlid Method")
 		// Error method does not necessarly close the request. Need to return.
