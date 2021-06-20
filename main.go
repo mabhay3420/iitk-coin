@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"log"
 	"os"
+	// "encoding/json"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -19,12 +20,24 @@ import (
 var db *sql.DB
 var err error
 
+// AIM : Clean Complete Code, Make is structured
+//: step 1: Use Structs
+//: step 2: Return Standard Errors : Remove Verbrose description (??)
+//: step 3: Use JSON
+
+type User struct {
+	Rollno   int    `json:"rollno"`
+	Name     string `json:"name"`
+	Coin     int    `json:"coin"`
+	Password string `json:"Password"`
+}
+
 func main() {
 	//For testing purpose only
 	os.Remove("students.db")
 	//Create Database
 	db, err = sql.Open("sqlite3", "./students.db")
-	if err != nil{
+	if err != nil {
 		log.Fatal(err)
 	}
 	// TODO: Learn why you need this

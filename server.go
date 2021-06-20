@@ -5,7 +5,7 @@
 //  You already have created a function earlier to add users to the database.
 //   Don't store the password as plain text. Apply hashing and salting.
 
-// 3. The /login endpoint will take in the rollno and password and
+// 3. The /login endpoint will take in the Rollno and password and
 // if verified successfully will return a JWT (JSON Web Token) as part of the response.
 
 // 4. Create an endpoint, say /secretpage that returns
@@ -16,10 +16,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
-	"strconv"
 	"net/http"
+	// "strconv"
 )
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -38,54 +39,48 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 
-	if(r.Method == "GET"){
+	if r.Method == "GET" {
 		w.WriteHeader(200)
 		fmt.Fprint(w, "Hello This is login Endpoint\n")
 		return
 	}
 
 	// Verify user
-
-	if err:= r.ParseForm();err != nil{
-		http.Error(w,"Invalid Input to the form",http.StatusBadRequest)
+	var user User
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, "Invalid Input to the form", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
+	// user.Rollno, err = strconv.Atoi(r.FormValue("Rollno"))
+	// user.password = r.FormValue("password")
 
-	rollno := r.FormValue("rollno")
-	password := r.FormValue("password")
+	// //? Shouldn't we use Errors which signify what went wrong.
+	// if err != nil {
+	// 	http.Error(w, "Roll number must be integer\n", http.StatusBadRequest)
+	// 	fmt.Println(err)
+	// 	return
+	// }
 
-	if(rollno =="" || password==""){
-		http.Error(w,"Roll No/Password Cannot be empty",http.StatusBadRequest)
-		fmt.Println("Empty password/rollno")
-		return
-	}
+	// Should Be handled on database side
+	// if(user.password==""){
+	// 	http.Error(w,"Password Cannot be empty",http.StatusBadRequest)
+	// 	fmt.Println("Empty password")
+	// 	return
+	// }
+	err = getUserInfo(&user)
 
-	roll_int,err := strconv.Atoi(rollno)
-
-	//? Shouldn't we use Errors which signify what went wrong.
-	if err != nil{
-		http.Error(w,"Roll number must be integer\n",http.StatusBadRequest)
-		fmt.Println(err)
-		return
-	}
-
-	name,coin,err := getUserInfo(roll_int,password)
-
-	if(err != nil){
+	if err != nil {
 		http.Error(w, "Invalid User Rollno/Password Combination", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
-
-	w.WriteHeader(200)
-	fmt.Fprint(w,"Hii ",name,"! Welcome\nYour Current Balance is ",coin," Coins\n")
-	fmt.Println("Login of",name,"Succesful")
+	w.Header().Set("Content-Type","application/json")
+	// Status OK
+	json.NewEncoder(w).Encode(user)
+	fmt.Println("Login of", user.Name, "Succesful")
 
 	// Compare with database Password.
-
-
-
 
 }
 
@@ -106,59 +101,67 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	// 	return
 	// }
 	// Don't Know what to do.
-	if(r.Method == "GET"){
+	if r.Method == "GET" {
 		w.WriteHeader(200)
 		fmt.Fprint(w, "Hello This is signup Endpoint\n")
 		return
 	}
 
-	// POST Format: rollno:-- name:--
+	// POST Format: Rollno:-- Name:--
 
-	if err := r.ParseForm(); err != nil{
-		http.Error(w,"Invalid input to Form",http.StatusBadRequest)
-		fmt.Println(err)
-		return
-	}
-
+	var user User
 	// get fields from request
-	rollno := r.FormValue("rollno")
-	name := r.FormValue("name")
-	password := r.FormValue("password")
-
-	// testing purpose
-
-	// Add to the user Database
-	// TODO: Find better method to store as int
-	roll_int,err := strconv.Atoi(rollno)
-
-	//? Shouldn't we use Errors which signify what went wrong.
-	if err != nil{
-		http.Error(w,"Roll number must be integer\n",http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+		http.Error(w, "Invalid input to Form", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
 
-	if(password == "" || name==""){
-		http.Error(w, "User Name/Password Can not be empty", http.StatusBadRequest)
-		fmt.Println("User Name/Password empty")
-		return
-	}
-	// Adding new user
-	err = addUser(roll_int,name,password)
+	user.Coin = 0
+	// user.Rollno, err := strconv.Atoi(r.FormValue("Rollno"))
+	// if err != nil {
+	// 	http.Error(w, "Invalid input to Form", http.StatusBadRequest)
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// user := User{
+	// 	Rollno:   roll_int,
+	// 	Name:     r.FormValue("Name"),
+	// 	password: r.FormValue("password"),
+	// 	Coin:     0,
+	// }
 
-	if(err != nil){
+	// // Add to the user Database
+	// // TODO: Find better method to store as int
+	// //? Shouldn't we use Errors which signify what went wrong.
+	// if err != nil {
+	// 	http.Error(w, "Roll number must be integer\n", http.StatusBadRequest)
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
+	// Will be performed on
+	// if password == "" || Name == "" {
+	// 	http.Error(w, "User Name/Password Can not be empty", http.StatusBadRequest)
+	// 	fmt.Println("User Name/Password empty")
+	// 	return
+	// }
+	// Adding new user
+	err = addUser(&user)
+
+	if err != nil {
 		http.Error(w, "Invalid User Name/Password or User Already Exists", http.StatusBadRequest)
-		fmt.Println("Invalid Request, DB error:",err)
+		fmt.Println("Invalid Request, DB error:", err)
 		return
 	}
 
 	w.WriteHeader(200)
-	fmt.Fprintf(w,"POST Request Succesful.\nUser Succesfully Added\nYour Rollno:%s Your Name:%s\n",rollno,name)
+	fmt.Fprintf(w, "POST Request Succesful.\nUser Succesfully Added\nYour Rollno:%d Your Name:%s\n", user.Rollno, user.Name)
 
 	// ! Should not write to header twice: http: superfluous response.WriteHeader call
 }
 
-func homeHandler(w http.ResponseWriter,r *http.Request){
+func homeHandler(w http.ResponseWriter, r *http.Request) {
 	// Correct Endpoint
 	// if r.URL.Path != "/signup" {
 	// 	http.Error(w, "404 Not found.", http.StatusNotFound)
@@ -168,20 +171,20 @@ func homeHandler(w http.ResponseWriter,r *http.Request){
 
 	// TODO : Learn More about Methods
 	// Valid Methods
-	if ( r.Method != "GET") {
+	if r.Method != "GET" {
 		http.Error(w, "Method is not Supported.", http.StatusMethodNotAllowed)
 		fmt.Println("Invlid Method")
 		// Error method does not necessarly close the request. Need to return.
 		return
 	}
 	w.WriteHeader(200)
-	fmt.Fprintf(w,"Hii there, Move to either login or signup")
+	fmt.Fprintf(w, "Hii there, Move to either login or signup")
 }
 
 func startServer() {
 
 	// Handle incoming requests
-	http.HandleFunc("/",homeHandler)
+	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/signup", signupHandler)
 
