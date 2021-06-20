@@ -20,10 +20,8 @@ func createTable() error {
 	if err != nil {
 		return err
 	}
-
-	// log.Println("Create Student table....")
 	createStatement.Exec()
-	log.Println("Tables ready.")
+	log.Println("tables ready.")
 
 	return nil
 }
@@ -46,7 +44,7 @@ func addUser(user *User) error {
 	}
 
 	// Valid input
-	log.Println("Add New User....")
+	log.Println("add New User....")
 	bytes, err := bcrypt.GenerateFromPassword([]byte(user.Password), 14)
 
 	if err != nil {
@@ -55,12 +53,12 @@ func addUser(user *User) error {
 	}
 	_, err = addStatement.Exec(user.Rollno, user.Name, user.Coin, string(bytes))
 
-	// Unique Constrain on Rollno
+	// Unique Constraint on Rollno
 	if err != nil {
-		log.Println("Unable to Add user")
+		log.Println("unable to Add user")
 		return err
 	} else {
-		log.Println("Succesfully Added New User.")
+		log.Println("succesfully Added New User.")
 	}
 
 	// testing purpose
@@ -75,7 +73,7 @@ func getUserInfo(user *User) error {
 
 	getUserStatement, err := db.Prepare("SELECT * FROM students WHERE Rollno=?")
 	if err != nil {
-		log.Println("Error preparing db Statement")
+		log.Println("error preparing db Statement")
 		return err
 	}
 	defer getUserStatement.Close()
@@ -84,7 +82,7 @@ func getUserInfo(user *User) error {
 
 	// If no such row exists(Both Rollno and Password should match) Scan will throw an error.
 	if err != nil {
-		log.Println("Error while getting user Information.")
+		log.Println("error while getting user Information.")
 		return err
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(userPass), []byte(user.Password))
@@ -102,7 +100,7 @@ func displayStudents() error {
 	displayStatement, err := db.Prepare("SELECT * FROM students ORDER BY Name")
 
 	if err != nil {
-		log.Println("Error preparing db Statement")
+		log.Println("error preparing db Statement")
 		return err
 	}
 	// TODO: Learn More
@@ -110,7 +108,7 @@ func displayStudents() error {
 	row, err := displayStatement.Query()
 
 	if err != nil {
-		log.Println("Error Displaying Students")
+		log.Println("error Displaying Students")
 		return err
 	}
 	// TODO: Learn More
@@ -125,7 +123,7 @@ func displayStudents() error {
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)
 	if err = row.Err(); err != nil {
-		log.Println("Error While reading rows")
+		log.Println("error While reading rows")
 		return err
 	}
 
