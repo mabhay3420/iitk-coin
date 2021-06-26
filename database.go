@@ -45,6 +45,7 @@ func addUser(user *User) error {
 
 	// Valid input
 	log.Println("add New User....")
+	// ? Why 14
 	bytes, err := bcrypt.GenerateFromPassword([]byte(user.Password), 14)
 
 	if err != nil {

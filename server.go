@@ -18,15 +18,42 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"log"
 	"net/http"
+	"time"
 	// "strconv"
 )
 
-type Response struct{
+// ? What information should we send to the client side?
+// ? Just the status code or some information in statement form?
+// ? If the later what type of information are sensitive and
+// ? should not be exposed to the client?
+
+type Response struct {
+	Rollno int    `json:"rollno"`
+	Name   string `json:"name"`
+	Coin   int    `json:"coin"`
+}
+
+// ? Find some secure method to save the key
+//https://www.sohamkamani.com/golang/jwt-authentication/#the-jwt-format
+
+// JWT key used to create the signature
+var jwtKey = []byte("hello_world")
+
+// read request
+type Credentials struct {
+	Rollno   int    `json:"rollno"`
+	Password string `json:"password"`
+}
+
+// Struct Which will be encoded to a JWT
+// StandardClaims will be used to provide fields like expiry time
+
+type Claims struct {
 	Rollno int `json:"rollno"`
-	Name string `json:"name"`
-	Coin int `json:"coin"`
+	jwt.StandardClaims
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -55,13 +82,53 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	err = getUserInfo(&user)
 
 	if err != nil {
-		http.Error(w, "invalid user rollno/password combination", http.StatusBadRequest)
+		http.Error(w, "invalid user rollno/password combination", http.StatusUnauthorized)
 		fmt.Println(err)
 		return
 	}
 
-	response := Response{user.Rollno,user.Name,user.Coin}
-	w.Header().Set("Content-Type","application/json")
+	// Valid User
+
+	// Step 1: Creating a JWT for User.
+
+	// Step 1a) Create a Payload for JWT.
+
+	// Expiration time of token : 5 min for now : need to refresh
+	expirationTime := time.Now().Add(5 * time.Minute)
+	claims := &Claims{
+		Rollno: user.Rollno,
+		StandardClaims: jwt.StandardClaims{
+			// Must be in unix milliseconds.
+			ExpiresAt: expirationTime.Unix(),
+		},
+	}
+
+	// Step 1b) Declare a token with algo used for hashing and the claims.
+
+	// TODO: Learn a bit about HS256.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Step 1c) Create the JWT string by hashing with key.
+	tokenString, err := token.SignedString(jwtKey)
+
+	if err != nil {
+		// Error in creating the JWT
+		http.Error(w, "Error in creating JWT", http.StatusInternalServerError)
+		fmt.Println(err)
+		return
+	}
+
+	// Step 2: Set Client Cookie for "token"
+	http.SetCookie(w, &http.Cookie{
+		Name:    "jwt-token",
+		Value:   tokenString,
+		Expires: expirationTime,
+	})
+
+	// Step 3: Usual Information
+
+	response := Response{user.Rollno, user.Name, user.Coin}
+	w.Header().Set("Content-Type", "application/json")
 	// Status OK
 	json.NewEncoder(w).Encode(response)
 	fmt.Println("Login of", user.Name, "Succesful")
@@ -103,11 +170,11 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("invalid Request, DB error:", err)
 		return
 	}
-	response := Response{user.Rollno,user.Name,user.Coin}
-	w.Header().Set("Content-Type","application/json")
+	response := Response{user.Rollno, user.Name, user.Coin}
+	w.Header().Set("Content-Type", "application/json")
 	// status OK
 	json.NewEncoder(w).Encode(response)
-	
+
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
