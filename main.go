@@ -9,7 +9,7 @@ package main
 import (
 	"database/sql"
 	"log"
-	"os"
+	// "os"
 	// "encoding/json"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
@@ -29,7 +29,7 @@ type User struct {
 //TODO : 1. Errors in json format 2. JWT 3. secret endpoint
 func main() {
 	//For testing purpose only
-	os.Remove("students.db")
+	// os.Remove("students.db")
 	//Create Database
 	db, err = sql.Open("sqlite3", "./students.db")
 	if err != nil {

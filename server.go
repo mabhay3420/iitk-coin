@@ -52,7 +52,8 @@ type Credentials struct {
 // StandardClaims will be used to provide fields like expiry time
 
 type Claims struct {
-	Rollno int `json:"rollno"`
+	Rollno int    `json:"rollno"`
+	Name   string `json:"name"`
 	jwt.StandardClaims
 }
 
@@ -93,10 +94,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Step 1a) Create a Payload for JWT.
 
-	// Expiration time of token : 5 min for now : need to refresh
-	expirationTime := time.Now().Add(5 * time.Minute)
+	// Expiration time of token : 1 min for now : need to refresh
+	expirationTime := time.Now().Add(1 * time.Minute)
 	claims := &Claims{
 		Rollno: user.Rollno,
+		Name:   user.Name,
 		StandardClaims: jwt.StandardClaims{
 			// Must be in unix milliseconds.
 			ExpiresAt: expirationTime.Unix(),
@@ -120,7 +122,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Step 2: Set Client Cookie for "token"
 	http.SetCookie(w, &http.Cookie{
-		Name:    "jwt-token",
+		Name:    "jwt",
 		Value:   tokenString,
 		Expires: expirationTime,
 	})
@@ -133,6 +135,75 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 	fmt.Println("Login of", user.Name, "Succesful")
 
+}
+
+type dummyResponse struct {
+	Message string `json:"message"`
+	User    string `json:"user"`
+	From    string `json:"from"`
+}
+
+func secretHandler(w http.ResponseWriter, r *http.Request) {
+	token, err := r.Cookie("jwt")
+
+	// Error in Cookie extraction
+	if err != nil {
+		if err == http.ErrNoCookie {
+			// No cookie means user is not logged in.
+			http.Error(w, "Unauthorized!", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Other type of Errors
+		http.Error(w, "Unknown Error", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// token present
+
+	tokenString := token.Value
+
+	// New instance of claims
+	claims := &Claims{}
+
+	// Parse the JWT string and store in `claims`.
+	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	// Problem with token
+	if err != nil {
+		// Signature did not match.
+		if err == jwt.ErrSignatureInvalid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Unknown Error
+		http.Error(w, "Unknown Error", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// ? 
+	// Expired
+	if !tkn.Valid {
+		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
+		fmt.Println("Token Expired")
+		return
+	}
+
+	// No problema : send response
+	dummyData := dummyResponse{"We are so excited to meet you", claims.Name, "invictus"}
+	// Status OK
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dummyData)
+	
+	// success
+	fmt.Println("Secret content Delievered to ", claims.Name)
 }
 
 func signupHandler(w http.ResponseWriter, r *http.Request) {
@@ -197,6 +268,7 @@ func startServer() {
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/signup", signupHandler)
+	http.HandleFunc("/secret",secretHandler)
 
 	// Start the server
 	fmt.Println("Starting Server at http://localhost:8080")
