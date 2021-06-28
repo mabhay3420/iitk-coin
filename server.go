@@ -1,18 +1,4 @@
-// 1. Create web server with two endpoints /login and /signup that accepts POST requests.
-
-// 2. The /signup endpoint will receive a new user's roll no,
-// password and other details and create a new user in the database.
-//  You already have created a function earlier to add users to the database.
-//   Don't store the password as plain text. Apply hashing and salting.
-
-// 3. The /login endpoint will take in the Rollno and password and
-// if verified successfully will return a JWT (JSON Web Token) as part of the response.
-
-// 4. Create an endpoint, say /secretpage that returns
-// some dummy data only if the user is logged in. By logged in here we mean
-// that the JWT sent along the request should be a valid token and the user
-// is authorized to access the endpoint.
-
+// TODO : A refresh endpoint.
 package main
 
 import (
@@ -52,8 +38,7 @@ type Credentials struct {
 // StandardClaims will be used to provide fields like expiry time
 
 type Claims struct {
-	Rollno int    `json:"rollno"`
-	Name   string `json:"name"`
+	Name string `json:"name"`
 	jwt.StandardClaims
 }
 
@@ -80,7 +65,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	err = getUserInfo(&user)
+	err = validateLogin(&user)
 
 	if err != nil {
 		http.Error(w, "invalid user rollno/password combination", http.StatusUnauthorized)
@@ -97,8 +82,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Expiration time of token : 1 min for now : need to refresh
 	expirationTime := time.Now().Add(1 * time.Minute)
 	claims := &Claims{
-		Rollno: user.Rollno,
-		Name:   user.Name,
+		Name: user.Name,
 		StandardClaims: jwt.StandardClaims{
 			// Must be in unix milliseconds.
 			ExpiresAt: expirationTime.Unix(),
@@ -150,13 +134,13 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if err == http.ErrNoCookie {
 			// No cookie means user is not logged in.
-			http.Error(w, "Unauthorized!", http.StatusUnauthorized)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			fmt.Println(err)
 			return
 		}
 
 		// Other type of Errors
-		http.Error(w, "Unknown Error", http.StatusBadRequest)
+		http.Error(w, "Unauthorized!", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
@@ -183,25 +167,25 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Unknown Error
-		http.Error(w, "Unknown Error", http.StatusBadRequest)
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
 
-	// ? 
 	// Expired
+	// ? Invalid/Expired claims will already throw an error in previous Step
+	// ? Then how can this token become invalid?
 	if !tkn.Valid {
 		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
 		fmt.Println("Token Expired")
 		return
 	}
 
-	// No problema : send response
 	dummyData := dummyResponse{"We are so excited to meet you", claims.Name, "invictus"}
 	// Status OK
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dummyData)
-	
+
 	// success
 	fmt.Println("Secret content Delievered to ", claims.Name)
 }
@@ -262,13 +246,128 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Hii there, Move to either login or signup")
 }
 
+// Task
+
+// 1. Create an endpoint that accepts a POST request and awards coins to a user.
+//    The body will have the rollno of the user and the number of coins to be given.
+
+// 2. Create an endpoint that accepts a POST request to transfer coins between two users.
+//    The body will have the rollnos of the particpating users and the number of coins to transfer.
+
+// 3. Create an endpoint that accepts a GET request and returns the coin balance of a user.
+//    The body will have the roll no of the user.
+
+// Notes
+
+// 1. The server handles API requests concurrently by design.
+//    By no way should your endpoints create or destroy coins when it is not intended.
+//    You need to take care that all the steps of your transactions either complete successfully or don't happen at all.
+
+// 2. Make sure that there is no such possible interleaving between two concurrent transactions that can cause unwanted behavior.
+//    To simulate and test different interleavings you can make use of sleep timers between lines of your code.
+
+// 3. Some of the endpoints that you will be creating would not be for all users but just admins,
+//    but you can ignore that for now. We'll take up permission levels a bit later.
+//    You can keep these APIs public for now i.e. no authorization required.
+
+// 4. Take care of as many edge cases as you can.
+
+type awardRequest struct {
+	Rollno int `json:"rollno"`
+	Award  int `json:"award"`
+}
+
+func awardHandler(w http.ResponseWriter, r *http.Request) {
+	// Must be a post request
+	if r.Method != "POST" {
+		http.Error(w, "Method Not Supported", http.StatusMethodNotAllowed)
+		fmt.Println("Unsupported Method Name")
+		return
+	}
+	// Verify User
+	// TODO : Create a function which does this authorization
+	// 	  so that we can use it frequently.
+	token, err := r.Cookie("jwt")
+
+	// Error in Cookie extraction
+	if err != nil {
+		if err == http.ErrNoCookie {
+			// No cookie means user is not logged in.
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Other type of Errors
+		http.Error(w, "Unauthorized!", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// token present
+
+	tokenString := token.Value
+
+	// New instance of claims
+	claims := &Claims{}
+
+	// Parse the JWT string and store in `claims`.
+	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	// Problem with token
+	if err != nil {
+		// Signature did not match.
+		if err == jwt.ErrSignatureInvalid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Unknown Error
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// Expired
+	// ? Invalid/Expired claims will already throw an error in previous Step
+	// ? Then how can this token become invalid?
+	if !tkn.Valid {
+		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
+		fmt.Println("Token Expired")
+		return
+	}
+
+	// * Authorized
+	var award awardRequest
+	if err := json.NewDecoder(r.Body).Decode(&award); err != nil {
+		http.Error(w, "Invalid Input to the form", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// All information provided
+	// awardUser can do both the things decrease or increase no of coins.
+	// So it become necessary here to check whether the no of coins
+	// to be awarded is positive or not.
+	if award.Award <= 0{
+		http.Error(w,"No of coins to be awarded must be a positive number",http.StatusBadRequest)
+		fmt.Println("Non-positive Award Requested. Aborted the process")
+		return
+	}
+	
+	err := updateUserCoin(award)
+}
+
 func startServer() {
 
 	// Handle incoming requests
 	http.HandleFunc("/", homeHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/signup", signupHandler)
-	http.HandleFunc("/secret",secretHandler)
+	http.HandleFunc("/secret", secretHandler)
 
 	// Start the server
 	fmt.Println("Starting Server at http://localhost:8080")

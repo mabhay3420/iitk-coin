@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -10,7 +11,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// TODO : Use Structs : Change the functions accordingly.
 //Create Table
 func createTable() error {
 
@@ -68,7 +68,7 @@ func addUser(user *User) error {
 	return nil
 }
 
-func getUserInfo(user *User) error {
+func validateLogin(user *User) error {
 	var err error
 	var userPass string
 
@@ -94,7 +94,27 @@ func getUserInfo(user *User) error {
 	//else return proper values
 	return err
 }
+func updateUserCoin(award *awardRequest) error{
+	getUserStatement, err := db.Prepare("SELECT * FROM students WHERE Rollno=?")
+	if err != nil {
+		log.Println("error preparing db Statement")
+		return err
+	}
+	defer getUserStatement.Close()
 
+	// Already authorized by now.
+	var user User
+	err = getUserStatement.QueryRow(award.Rollno).Scan(&user.Rollno, &user.Name, &user.Coin, &user.Password)
+
+	// If no such row exists(Both Rollno and Password should match) Scan will throw an error.
+	// ! This will happen no more because the user is validated.
+	if err != nil {
+		log.Println("error while getting user Information.")
+		return err
+	}
+	//else return proper values
+	return err
+}
 // Display Student
 func displayStudents() error {
 
