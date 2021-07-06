@@ -65,7 +65,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 		return
 	}
-	err = validateLogin(&user)
+	err = validateLogin(&user,false)
 
 	if err != nil {
 		http.Error(w, "invalid user rollno/password combination", http.StatusUnauthorized)
@@ -372,12 +372,145 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = updateUserCoin(&award)
+	err = awardCoin(&award)
 	if(err != nil){
 		http.Error(w,"Unable to Award Coins",http.StatusInternalServerError)
 		fmt.Println(err)
 		return
 	}
+
+	fmt.Println(award.Award,"Coins awarded to",award.Rollno)
+
+	// TODO : Send total coins to user.
+	w.Header().Set("Content-Type","application/json")
+	json.NewEncoder(w).Encode(award)
+}
+
+
+type transferRequest struct {
+	FromRollno int `json:"from"`
+	ToRollno int `json:"to"`
+	Amount  int `json:"amount"`
+}
+
+func transferHandler(w http.ResponseWriter, r *http.Request) {
+	// Must be a post request
+	if r.Method != "POST" {
+		http.Error(w, "Method Not Supported", http.StatusMethodNotAllowed)
+		fmt.Println("Unsupported Method Name")
+		return
+	}
+	// Verify User
+	// TODO : Create a function which does this authorization
+	// 	  so that we can use it frequently.
+	token, err := r.Cookie("jwt")
+
+	// Error in Cookie extraction
+	if err != nil {
+		if err == http.ErrNoCookie {
+			// No cookie means user is not logged in.
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Other type of Errors
+		http.Error(w, "Unauthorized!", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// token present
+
+	tokenString := token.Value
+
+	// New instance of claims
+	claims := &Claims{}
+
+	// Parse the JWT string and store in `claims`.
+	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	// Problem with token
+	if err != nil {
+		// Signature did not match.
+		if err == jwt.ErrSignatureInvalid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			fmt.Println(err)
+			return
+		}
+
+		// Unknown Error
+		http.Error(w, "Unauthorized", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// Expired
+	// ? Invalid/Expired claims will already throw an error in previous Step
+	// ? Then how can this token become invalid?
+	if !tkn.Valid {
+		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
+		fmt.Println("Token Expired")
+		return
+	}
+
+	// * Authorized
+	var transfer transferRequest
+	if err := json.NewDecoder(r.Body).Decode(&transfer); err != nil {
+		http.Error(w, "Invalid Input to the form", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	//sanity checks
+	Sender := User{
+		Rollno: transfer.FromRollno,
+	}
+	err = validateLogin(&Sender,true)
+	if err!= nil{
+		fmt.Println()
+		http.Error(w,"No such user", http.StatusBadRequest)
+		return
+	}
+
+	Reciever := User{
+		Rollno: transfer.ToRollno,
+	}
+
+	// It might happen that the database is busy so
+	// ivalidate the request.
+	err = validateLogin(&Reciever,true)
+	if err!= nil{
+		fmt.Println()
+		http.Error(w,"No such user", http.StatusBadRequest)
+		return
+	}
+
+	if transfer.Amount<= 0{
+		http.Error(w,"No of coins to be transferred must be a positive number",http.StatusBadRequest)
+		fmt.Println("Non-positive Transfer Requested. Aborted the process")
+		return
+	}
+
+	if transfer.Amount > Sender.Coin{
+		http.Error(w,"Not Enough Amount",http.StatusBadRequest)
+		fmt.Println("Sender do not have enough money")
+		return
+	}
+	err = transferCoin(&transfer)
+	if(err != nil){
+		http.Error(w,"Unable to Award Coins",http.StatusInternalServerError)
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(transfer.Amount,"Coins transferred from",transfer.FromRollno, "to", transfer.ToRollno)
+
+	// TODO : Send total coins to user.
+	w.Header().Set("Content-Type","application/json")
+	json.NewEncoder(w).Encode(transfer)
 }
 
 func startServer() {
@@ -388,6 +521,7 @@ func startServer() {
 	http.HandleFunc("/signup", signupHandler)
 	http.HandleFunc("/secret", secretHandler)
 	http.HandleFunc("/award",awardHandler)
+	http.HandleFunc("/transfer",transferHandler)
 
 	// Start the server
 	fmt.Println("Starting Server at http://localhost:8080")

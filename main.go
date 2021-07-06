@@ -2,7 +2,9 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
+
 	// "os"
 	// "encoding/json"
 	// Import sqlite3
@@ -36,9 +38,16 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// display current information
+	fmt.Println("===-------User List-------===")
+	displayStudents()
+	fmt.Println("===-------Award History------===")
+	displayAward()
+	fmt.Println("===-------Transfer History------===")
+	displayTransfer()
+	fmt.Println("===----------Here you go--------===")
+
 	// Start Server
 	startServer()
 
-	// Display Users
-	displayStudents()
 }

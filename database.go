@@ -76,15 +76,13 @@ func addUser(user *User) error {
 	}
 
 	// testing purpose
-	displayStudents()
+	// displayStudents()
 
 	return nil
 }
-
-func validateLogin(user *User) error {
+func validateLogin(user *User, hasCookie bool) error {
 	var err error
 	var userPass string
-
 	getUserStatement, err := db.Prepare("SELECT * FROM students WHERE Rollno=?")
 	if err != nil {
 		log.Println("error preparing db Statement")
@@ -99,6 +97,12 @@ func validateLogin(user *User) error {
 		log.Println("error while getting user Information.")
 		return err
 	}
+
+	// must be true
+	// ! Do not access password field though.
+	if hasCookie {
+		return nil
+	}
 	err = bcrypt.CompareHashAndPassword([]byte(userPass), []byte(user.Password))
 
 	if err != nil {
@@ -107,14 +111,14 @@ func validateLogin(user *User) error {
 	//else return proper values
 	return err
 }
-func updateUserCoin(award *awardRequest) error {
+func awardCoin(award *awardRequest) error {
 
 	// Need to complete this thing in one go.
 	ctx := context.Background()
 
 	// ? transactions options
-	tx,err := db.BeginTx(ctx,nil)
-	if(err != nil){
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
 		log.Println(err)
 		return err
 	}
@@ -122,32 +126,8 @@ func updateUserCoin(award *awardRequest) error {
 	// ignore rollback if the tx has been commited later in the function
 	defer tx.Rollback()
 
-
-	getUserStatement, err := tx.Prepare("SELECT * FROM students WHERE Rollno=?")
+	awardStatement, err := tx.Prepare("UPDATE students SET Coins = Coins + ? WHERE Rollno = ? ")
 	if err != nil {
-		log.Println("error preparing db Statement")
-
-		// might give error too
-		tx.Rollback()
-		return err
-	}
-
-	// Prepared statements take server space so close them after use.
-	defer getUserStatement.Close()
-
-	// Already authorized by now.
-	var user User
-	err = getUserStatement.QueryRow(award.Rollno).Scan(&user.Rollno, &user.Name, &user.Coin, &user.Password)
-	if err!= nil{
-		log.Println("error getting user statement")
-
-		tx.Rollback()
-		return err
-	}
-
-	// Update user balance
-	awardStatement,err := tx.Prepare("UPDATE students SET Coins = Coins + ? WHERE Rollno = ? ")
-	if err!= nil{
 		log.Println("error while preparing award statement")
 
 		tx.Rollback()
@@ -155,16 +135,16 @@ func updateUserCoin(award *awardRequest) error {
 	}
 	defer awardStatement.Close()
 
-	_, err = awardStatement.Exec(award.Award,award.Rollno)
-	if err!= nil{
+	_, err = awardStatement.Exec(award.Award, award.Rollno)
+	if err != nil {
 		log.Println("error while awarding the student")
 
 		tx.Rollback()
 		return err
 	}
 	// Update award table
-	recordStatement,err := tx.Prepare("INSERT INTO awards ( Time, AwardeeRollno, Amount ) VALUES(?,?,?)")
-	if err!= nil{
+	recordStatement, err := tx.Prepare("INSERT INTO awards ( Time, AwardeeRollno, Amount ) VALUES(?,?,?)")
+	if err != nil {
 		log.Println("error while preparing award statement")
 
 		tx.Rollback()
@@ -172,18 +152,95 @@ func updateUserCoin(award *awardRequest) error {
 	}
 	defer recordStatement.Close()
 
-	_, err = recordStatement.Exec(time.Now(),award.Rollno, award.Award)
-	if err!= nil{
+	_, err = recordStatement.Exec(time.Now(), award.Rollno, award.Award)
+	if err != nil {
 		log.Println("error while recording the award the student")
 
 		tx.Rollback()
 		return err
 	}
 
+	// Succesful
+
+	err = tx.Commit()
+	// displayAward()
+
+	return err
+}
+
+func transferCoin(transfer *transferRequest) error {
+
+	// Need to complete this thing in one go.
+	ctx := context.Background()
+
+	// ? transactions options
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	// ignore rollback if the tx has been commited later in the function
+	defer tx.Rollback()
+
+	// Update sender balance
+	senderStatement, err := tx.Prepare("UPDATE students SET Coins = Coins - ? WHERE Rollno = ? ")
+	if err != nil {
+		log.Println("error while preparing award statement for sender")
+
+		tx.Rollback()
+		return err
+	}
+	defer senderStatement.Close()
+
+	_, err = senderStatement.Exec(transfer.Amount, transfer.FromRollno)
+	if err != nil {
+		log.Println("error while updating sender info")
+
+		tx.Rollback()
+		return err
+	}
+	// update Reciever balance
+	recieverStatement, err := tx.Prepare("UPDATE students SET Coins = Coins + ? WHERE Rollno = ? ")
+	if err != nil {
+		log.Println("error while preparing statement for reciever")
+
+		tx.Rollback()
+		return err
+	}
+	defer recieverStatement.Close()
+
+	_, err = recieverStatement.Exec(transfer.Amount, transfer.ToRollno)
+	if err != nil {
+		log.Println("error while updating reciever info")
+
+		tx.Rollback()
+		return err
+	}
+	// Update transfer table
+	recordStatement, err := tx.Prepare("INSERT INTO transfers ( Time , SenderRollno ,RecieverRollno , Amount ) VALUES(?,?,?,?)")
+	if err != nil {
+		log.Println("error while preparing record statement of transfer")
+
+		tx.Rollback()
+		return err
+	}
+	defer recordStatement.Close()
+
+	log.Println(transfer)
+	_, err = recordStatement.Exec(time.Now(), transfer.FromRollno, transfer.ToRollno, transfer.Amount)
+
+	if err != nil {
+		log.Println("error while recording the transfer")
+
+		tx.Rollback()
+		return err
+	}
 
 	// Succesful
 
 	err = tx.Commit()
+	// displayAward()
 
 	return err
 }
@@ -222,4 +279,71 @@ func displayStudents() error {
 	}
 
 	return nil
+}
+
+func displayAward() error {
+	displayStatement, err := db.Prepare("SELECT * FROM awards ORDER BY Time ")
+
+	if err != nil {
+		log.Println("error preparing db Statement")
+		return err
+	}
+	// TODO: Learn More
+	defer displayStatement.Close()
+	row, err := displayStatement.Query()
+
+	if err != nil {
+		log.Println("error Displaying Awards")
+		return err
+	}
+	defer row.Close()
+	for row.Next() {
+		var award awardRequest
+		var stamp time.Time
+		row.Scan(&stamp, &award.Rollno, &award.Award)
+
+		log.Println("Time:", stamp, "Rollno:", award.Rollno, "Award :", award.Award)
+	}
+	// Maybe not in the right
+	// format while implicit conversion (e.g. String to Int)
+	if err = row.Err(); err != nil {
+		log.Println("error While reading rows")
+		return err
+	}
+
+	return nil
+
+}
+func displayTransfer() error {
+	displayStatement, err := db.Prepare("SELECT * FROM transfers ORDER BY Time ")
+
+	if err != nil {
+		log.Println("error preparing db Statement")
+		return err
+	}
+	// TODO: Learn More
+	defer displayStatement.Close()
+	row, err := displayStatement.Query()
+
+	if err != nil {
+		log.Println("error Displaying Transfers")
+		return err
+	}
+	defer row.Close()
+	for row.Next() {
+		var transfer transferRequest
+		var stamp time.Time
+		row.Scan(&stamp, &transfer.FromRollno, &transfer.ToRollno, &transfer.Amount)
+
+		log.Println("Time:", stamp, "Sender Rollno:", transfer.FromRollno, "Reciever Rollno:", transfer.ToRollno, "Amount:", transfer.Amount)
+	}
+	// Maybe not in the right
+	// format while implicit conversion (e.g. String to Int)
+	if err = row.Err(); err != nil {
+		log.Println("error While reading rows")
+		return err
+	}
+
+	return nil
+
 }
