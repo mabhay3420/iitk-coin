@@ -1,11 +1,14 @@
-
 package main
 
 import (
 	// "database/sql"
 	"errors"
+	// "fmt"
 	"log"
+	"time"
+
 	// "os"
+	"context"
 	// Import sqlite3
 	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/crypto/bcrypt"
@@ -16,13 +19,23 @@ func createTable() error {
 
 	// Roll Number Should Be unique.
 	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( Rollno INTEGER PRIMARY KEY NOT NULL,Name TEXT NOT NULL,Coins INTEGER NOT NULL,Password TEXT NOT NULL)")
-
 	if err != nil {
 		return err
 	}
+	awardStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS awards ( Time TIMESTAMP, AwardeeRollno INTEGER NOT NULL,Amount INTEGER NOT NULL)")
+	if err != nil {
+		return err
+	}
+	transferStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS transfers ( Time TIMESTAMP, SenderRollno INTEGER NOT NULL,RecieverRollno INTEGER NOT NULL,Amount INTEGER NOT NULL)")
+	if err != nil {
+		return err
+	}
+	// Create Tables
 	createStatement.Exec()
-	log.Println("tables ready.")
+	awardStatement.Exec()
+	transferStatement.Exec()
 
+	log.Println("tables ready.")
 	return nil
 }
 
@@ -94,27 +107,87 @@ func validateLogin(user *User) error {
 	//else return proper values
 	return err
 }
-func updateUserCoin(award *awardRequest) error{
-	getUserStatement, err := db.Prepare("SELECT * FROM students WHERE Rollno=?")
-	if err != nil {
-		log.Println("error preparing db Statement")
+func updateUserCoin(award *awardRequest) error {
+
+	// Need to complete this thing in one go.
+	ctx := context.Background()
+
+	// ? transactions options
+	tx,err := db.BeginTx(ctx,nil)
+	if(err != nil){
+		log.Println(err)
 		return err
 	}
+
+	// ignore rollback if the tx has been commited later in the function
+	defer tx.Rollback()
+
+
+	getUserStatement, err := tx.Prepare("SELECT * FROM students WHERE Rollno=?")
+	if err != nil {
+		log.Println("error preparing db Statement")
+
+		// might give error too
+		tx.Rollback()
+		return err
+	}
+
+	// Prepared statements take server space so close them after use.
 	defer getUserStatement.Close()
 
 	// Already authorized by now.
 	var user User
 	err = getUserStatement.QueryRow(award.Rollno).Scan(&user.Rollno, &user.Name, &user.Coin, &user.Password)
+	if err!= nil{
+		log.Println("error getting user statement")
 
-	// If no such row exists(Both Rollno and Password should match) Scan will throw an error.
-	// ! This will happen no more because the user is validated.
-	if err != nil {
-		log.Println("error while getting user Information.")
+		tx.Rollback()
 		return err
 	}
-	//else return proper values
+
+	// Update user balance
+	awardStatement,err := tx.Prepare("UPDATE students SET Coins = Coins + ? WHERE Rollno = ? ")
+	if err!= nil{
+		log.Println("error while preparing award statement")
+
+		tx.Rollback()
+		return err
+	}
+	defer awardStatement.Close()
+
+	_, err = awardStatement.Exec(award.Award,award.Rollno)
+	if err!= nil{
+		log.Println("error while awarding the student")
+
+		tx.Rollback()
+		return err
+	}
+	// Update award table
+	recordStatement,err := tx.Prepare("INSERT INTO awards ( Time, AwardeeRollno, Amount ) VALUES(?,?,?)")
+	if err!= nil{
+		log.Println("error while preparing award statement")
+
+		tx.Rollback()
+		return err
+	}
+	defer recordStatement.Close()
+
+	_, err = recordStatement.Exec(time.Now(),award.Rollno, award.Award)
+	if err!= nil{
+		log.Println("error while recording the award the student")
+
+		tx.Rollback()
+		return err
+	}
+
+
+	// Succesful
+
+	err = tx.Commit()
+
 	return err
 }
+
 // Display Student
 func displayStudents() error {
 

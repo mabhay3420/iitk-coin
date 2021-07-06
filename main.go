@@ -31,7 +31,10 @@ func main() {
 	defer db.Close()
 
 	//Create table
-	createTable()
+	err = createTable()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Start Server
 	startServer()

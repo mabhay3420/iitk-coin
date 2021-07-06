@@ -80,7 +80,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Step 1a) Create a Payload for JWT.
 
 	// Expiration time of token : 1 min for now : need to refresh
-	expirationTime := time.Now().Add(1 * time.Minute)
+	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &Claims{
 		Name: user.Name,
 		StandardClaims: jwt.StandardClaims{
@@ -272,6 +272,20 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 // 4. Take care of as many edge cases as you can.
 
+
+// Possible edge cases
+// Award:
+// 1. negative or 0 amount : need to check
+// 2. Does not fit in range of integer : json decode should throw an error ideally : need to check
+// 3. User does not exist : authorization
+
+// transfer
+// 1. Invalid amount : 0 or negative or sender do not enough amount : need to check
+// 2. Sender Unauthorized : authorization
+// 2. Second user does not exist : error while getting user data.
+
+//
+
 type awardRequest struct {
 	Rollno int `json:"rollno"`
 	Award  int `json:"award"`
@@ -357,8 +371,13 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Non-positive Award Requested. Aborted the process")
 		return
 	}
-	
-	err := updateUserCoin(award)
+
+	err = updateUserCoin(&award)
+	if(err != nil){
+		http.Error(w,"Unable to Award Coins",http.StatusInternalServerError)
+		fmt.Println(err)
+		return
+	}
 }
 
 func startServer() {
@@ -368,6 +387,7 @@ func startServer() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/signup", signupHandler)
 	http.HandleFunc("/secret", secretHandler)
+	http.HandleFunc("/award",awardHandler)
 
 	// Start the server
 	fmt.Println("Starting Server at http://localhost:8080")
