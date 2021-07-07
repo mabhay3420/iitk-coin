@@ -19,6 +19,8 @@ type User struct {
 	Name     string `json:"name"`
 	Coin     int    `json:"coin"`
 	Password string `json:"password"`
+	Role     string `json:"role"`
+	Activity int    `json:"activity"`
 }
 
 func main() {

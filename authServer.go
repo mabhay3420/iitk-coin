@@ -33,7 +33,7 @@ type Credentials struct {
 // StandardClaims will be used to provide fields like expiry time
 
 type Claims struct {
-	Name string `json:"name"`
+	Rollno int `json:"rollno"`
 	jwt.StandardClaims
 }
 
@@ -78,7 +78,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Expiration time of token : 5 min for now : need to refresh
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &Claims{
-		Name: user.Name,
+		Rollno: user.Rollno,
 		StandardClaims: jwt.StandardClaims{
 			// Must be in unix milliseconds.
 			ExpiresAt: expirationTime.Unix(),
@@ -143,8 +143,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user.Coin = 0
-	// Adding new user
+	// Adding new user : Rollno, Name , Password are expected.
 	err = addUser(&user)
 
 	if err != nil {
@@ -159,7 +158,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func checkCookie(w http.ResponseWriter, r *http.Request) error {
+func checkCookie(w http.ResponseWriter, r *http.Request) (int,error) {
 	// Verify User
 	token, err := r.Cookie("jwt")
 
@@ -169,13 +168,13 @@ func checkCookie(w http.ResponseWriter, r *http.Request) error {
 			// No cookie means user is not logged in.
 			// http.Error(w, "No cookie faun", http.StatusUnauthorized)
 			// fmt.Println(err)
-			return err
+			return 0,err
 		}
 
 		// Other type of Errors
 		// http.Error(w, "Unauthorized!", http.StatusBadRequest)
 		// fmt.Println(err)
-		return err
+		return 0,err
 	}
 
 	// token present
@@ -196,13 +195,13 @@ func checkCookie(w http.ResponseWriter, r *http.Request) error {
 		if err == jwt.ErrSignatureInvalid {
 			// http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			// fmt.Println(err)
-			return err
+			return 0,err
 		}
 
 		// Unknown Error
 		// http.Error(w, "Unauthorized", http.StatusBadRequest)
 		// fmt.Println(err)
-		return err
+		return 0,err
 	}
 
 	// Expired
@@ -211,9 +210,9 @@ func checkCookie(w http.ResponseWriter, r *http.Request) error {
 	if !tkn.Valid {
 		// http.Error(w, "you need to log in again!", http.StatusUnauthorized)
 		// fmt.Println("Token Expired")
-		return fmt.Errorf("invalid token")
+		return 0,fmt.Errorf("invalid token")
 	}
 
-	return nil
+	return claims.Rollno,nil
 
 }

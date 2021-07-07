@@ -18,7 +18,7 @@ import (
 func createTable() error {
 
 	// Roll Number Should Be unique.
-	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( Rollno INTEGER PRIMARY KEY NOT NULL,Name TEXT NOT NULL,Coins INTEGER NOT NULL,Password TEXT NOT NULL)")
+	createStatement, err := db.Prepare("CREATE TABLE IF NOT EXISTS students ( Rollno INTEGER PRIMARY KEY NOT NULL,Name TEXT NOT NULL,Coins INTEGER NOT NULL,Password TEXT NOT NULL, Role string TEXT NOT NULL, Activity INTEGER NOT NULL)")
 	if err != nil {
 		return err
 	}
@@ -43,7 +43,7 @@ func createTable() error {
 func addUser(user *User) error {
 
 	// Add New User
-	addStatement, err := db.Prepare("INSERT INTO students ( Rollno , Name , Coins,Password) VALUES(?,?,?,?)")
+	addStatement, err := db.Prepare("INSERT INTO students ( Rollno , Name , Coins,Password, Role, Activity) VALUES(?,?,?,?,?,?)")
 
 	if err != nil {
 		log.Println("error preparing Statement")
@@ -56,6 +56,25 @@ func addUser(user *User) error {
 		return err
 	}
 
+	user.Coin = 0 // starting point
+	user.Role = "STUDENT"
+	user.Activity = 0 // staring point
+
+	// Find role : assign the most powerful role
+	// student --> council core ---> admin
+	for _, rollno := range COUNCIL_CORE {
+		if rollno == user.Rollno {
+			user.Role = "COUNCIL_CORE"
+			break
+		}
+	}
+	for _, rollno := range ADMIN {
+		if rollno == user.Rollno {
+			user.Role = "ADMIN"
+			break
+		}
+	}
+
 	// Valid input
 	log.Println("add New User....")
 	// ? Why 14
@@ -65,7 +84,7 @@ func addUser(user *User) error {
 		log.Println("error while hashing the Password")
 		return err
 	}
-	_, err = addStatement.Exec(user.Rollno, user.Name, user.Coin, string(bytes))
+	_, err = addStatement.Exec(user.Rollno, user.Name, user.Coin, string(bytes),user.Role,user.Activity)
 
 	// Unique Constraint on Rollno
 	if err != nil {
@@ -90,7 +109,7 @@ func validateLogin(user *User, hasCookie bool) error {
 	}
 	defer getUserStatement.Close()
 
-	err = getUserStatement.QueryRow(user.Rollno).Scan(&user.Rollno, &user.Name, &user.Coin, &userPass)
+	err = getUserStatement.QueryRow(user.Rollno).Scan(&user.Rollno, &user.Name, &user.Coin, &userPass, &user.Role, &user.Activity)
 
 	// If no such row exists(Both Rollno and Password should match) Scan will throw an error.
 	if err != nil {

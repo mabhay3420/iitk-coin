@@ -3,7 +3,7 @@ package main
 import (
 	// "database/sql"
 	// "errors"
-	// "fmt"
+	"fmt"
 	"log"
 	"time"
 
@@ -13,6 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	// "golang.org/x/crypto/bcrypt"
 )
+
 // Display Student
 func displayStudents() error {
 
@@ -35,9 +36,9 @@ func displayStudents() error {
 	for row.Next() {
 		var user User
 
-		row.Scan(&user.Rollno, &user.Name, &user.Coin, &user.Password)
+		row.Scan(&user.Rollno, &user.Name, &user.Coin, &user.Password, &user.Role, &user.Activity)
 
-		log.Println("User:", "Rollno:", user.Rollno, "Name:", user.Name)
+		fmt.Println(user)
 	}
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)
@@ -70,7 +71,8 @@ func displayAward() error {
 		var stamp time.Time
 		row.Scan(&stamp, &award.Rollno, &award.Award)
 
-		log.Println("Time:", stamp, "Rollno:", award.Rollno, "Award :", award.Award)
+		// we do not need time here.
+		fmt.Println(stamp, award)
 	}
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)
@@ -103,7 +105,8 @@ func displayTransfer() error {
 		var stamp time.Time
 		row.Scan(&stamp, &transfer.FromRollno, &transfer.ToRollno, &transfer.Amount)
 
-		log.Println("Time:", stamp, "Sender Rollno:", transfer.FromRollno, "Reciever Rollno:", transfer.ToRollno, "Amount:", transfer.Amount)
+		// no need of log here
+		fmt.Println(stamp.Round(0), transfer)
 	}
 	// Maybe not in the right
 	// format while implicit conversion (e.g. String to Int)

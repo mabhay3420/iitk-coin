@@ -13,6 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	// "golang.org/x/crypto/bcrypt"
 )
+
 func awardCoin(award *awardRequest) error {
 
 	// Need to complete this thing in one go.
@@ -42,6 +43,25 @@ func awardCoin(award *awardRequest) error {
 		log.Println("error while awarding the student")
 
 		tx.Rollback()
+		return err
+	}
+
+	// TODO : Find a way to use these function in the
+	// transactions directly. Right now any such function call
+	// will read values which are not updated i.e. outside transactions
+	activityStatement, err := tx.Prepare("UPDATE students SET Activity = Activity + 1 WHERE Rollno = ? ")
+	if err != nil {
+		log.Println("error while preparing activity statement")
+		tx.Rollback()
+		return err
+	}
+	defer activityStatement.Close()
+
+	// Roll no are unique so atmax 1 row will
+	// be updated
+	_, err = activityStatement.Exec(award.Rollno)
+	if err != nil {
+		log.Println("error while updating student activity")
 		return err
 	}
 	// Update award table
@@ -121,7 +141,7 @@ func transferCoin(transfer *transferRequest) error {
 		// * destruction of 33% of _coin.
 		transfer.Amount = (67 * transfer.Amount) / 100
 	}
-	
+
 	_, err = recieverStatement.Exec(transfer.Amount, transfer.ToRollno)
 	if err != nil {
 		log.Println("error while updating reciever info")
@@ -141,7 +161,6 @@ func transferCoin(transfer *transferRequest) error {
 
 	// ? What should we record here: real transfer money
 	// ? or after deducting taxes.
-	log.Println(transfer)
 	_, err = recordStatement.Exec(time.Now(), transfer.FromRollno, transfer.ToRollno, transfer.Amount)
 
 	if err != nil {

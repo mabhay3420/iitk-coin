@@ -17,7 +17,7 @@ type dummyResponse struct {
 
 func secretHandler(w http.ResponseWriter, r *http.Request) {
 
-	if err := checkCookie(w, r); err != nil {
+	if _,err := checkCookie(w, r); err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		fmt.Println(err)
 		return
