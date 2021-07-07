@@ -11,7 +11,6 @@ import (
 	// "strconv"
 )
 
-
 type Response struct {
 	Rollno int    `json:"rollno"`
 	Name   string `json:"name"`
@@ -69,13 +68,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// issue new cookie every time
 	// Valid User
 
 	// Step 1: Creating a JWT for User.
 
 	// Step 1a) Create a Payload for JWT.
 
-	// Expiration time of token : 1 min for now : need to refresh
+	// Expiration time of token : 5 min for now : need to refresh
 	expirationTime := time.Now().Add(5 * time.Minute)
 	claims := &Claims{
 		Name: user.Name,
@@ -156,5 +156,64 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// status OK
 	json.NewEncoder(w).Encode(response)
+
+}
+
+func checkCookie(w http.ResponseWriter, r *http.Request) error {
+	// Verify User
+	token, err := r.Cookie("jwt")
+
+	// Error in Cookie extraction
+	if err != nil {
+		if err == http.ErrNoCookie {
+			// No cookie means user is not logged in.
+			// http.Error(w, "No cookie faun", http.StatusUnauthorized)
+			// fmt.Println(err)
+			return err
+		}
+
+		// Other type of Errors
+		// http.Error(w, "Unauthorized!", http.StatusBadRequest)
+		// fmt.Println(err)
+		return err
+	}
+
+	// token present
+
+	tokenString := token.Value
+
+	// New instance of claims
+	claims := &Claims{}
+
+	// Parse the JWT string and store in `claims`.
+	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	// Problem with token
+	if err != nil {
+		// Signature did not match.
+		if err == jwt.ErrSignatureInvalid {
+			// http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			// fmt.Println(err)
+			return err
+		}
+
+		// Unknown Error
+		// http.Error(w, "Unauthorized", http.StatusBadRequest)
+		// fmt.Println(err)
+		return err
+	}
+
+	// Expired
+	// ? Invalid/Expired claims will already throw an error in previous Step
+	// ? Then how can this token become invalid?
+	if !tkn.Valid {
+		// http.Error(w, "you need to log in again!", http.StatusUnauthorized)
+		// fmt.Println("Token Expired")
+		return fmt.Errorf("invalid token")
+	}
+
+	return nil
 
 }

@@ -102,6 +102,7 @@ func startServer() {
 	http.HandleFunc("/secret", secretHandler)
 	http.HandleFunc("/award", awardHandler)
 	http.HandleFunc("/transfer", transferHandler)
+	http.HandleFunc("/balance",balanceHandler)
 
 	// Start the server
 	fmt.Println("Starting Server at http://localhost:8080")

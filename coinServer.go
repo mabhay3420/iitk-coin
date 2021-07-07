@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
+	// "github.com/dgrijalva/jwt-go"
 	// "log"
 	"net/http"
 	// "time"
 	// "strconv"
 )
+
 // Task
 
 // 1. Create an endpoint that accepts a POST request and awards coins to a user.
@@ -35,7 +36,6 @@ import (
 
 // 4. Take care of as many edge cases as you can.
 
-
 // Possible edge cases
 // Award:
 // 1. negative or 0 amount : need to check
@@ -48,6 +48,47 @@ import (
 // 2. Second user does not exist : error while getting user data.
 
 //
+type balanceRequest struct {
+	Rollno int `json:"rollno"`
+}
+
+func balanceHandler(w http.ResponseWriter, r *http.Request) {
+	// Must be a get request
+	if r.Method != "GET" {
+		http.Error(w, "Method Not Supported", http.StatusMethodNotAllowed)
+		fmt.Println("Unsupported Method ")
+		return
+	}
+
+	err := checkCookie(w, r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		fmt.Println(err)
+		return
+	}
+
+	// * Authorized
+	var balance balanceRequest
+	if err := json.NewDecoder(r.Body).Decode(&balance); err != nil {
+		http.Error(w, "Invalid Input to the form", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	user := User{ Rollno: balance.Rollno}
+	err = validateLogin(&user,true) // has a cookie
+	if err != nil {
+		// extra sanity check
+		fmt.Println("Invalid id/passoword")
+		http.Error(w, "No such user", http.StatusBadRequest)
+		return
+	}
+	response := Response{ Rollno: user.Rollno, Name: user.Name, Coin: user.Coin}
+
+	fmt.Println("Balance of",user.Name,"is",user.Coin)
+	w.Header().Set("Content-Type","application/json")
+	json.NewEncoder(w).Encode(response)
+}
 
 type awardRequest struct {
 	Rollno int `json:"rollno"`
@@ -61,59 +102,10 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Unsupported Method Name")
 		return
 	}
-	// Verify User
-	// TODO : Create a function which does this authorization
-	// 	  so that we can use it frequently.
-	token, err := r.Cookie("jwt")
 
-	// Error in Cookie extraction
-	if err != nil {
-		if err == http.ErrNoCookie {
-			// No cookie means user is not logged in.
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			fmt.Println(err)
-			return
-		}
-
-		// Other type of Errors
-		http.Error(w, "Unauthorized!", http.StatusBadRequest)
+	if err := checkCookie(w, r); err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		fmt.Println(err)
-		return
-	}
-
-	// token present
-
-	tokenString := token.Value
-
-	// New instance of claims
-	claims := &Claims{}
-
-	// Parse the JWT string and store in `claims`.
-	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
-	})
-
-	// Problem with token
-	if err != nil {
-		// Signature did not match.
-		if err == jwt.ErrSignatureInvalid {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			fmt.Println(err)
-			return
-		}
-
-		// Unknown Error
-		http.Error(w, "Unauthorized", http.StatusBadRequest)
-		fmt.Println(err)
-		return
-	}
-
-	// Expired
-	// ? Invalid/Expired claims will already throw an error in previous Step
-	// ? Then how can this token become invalid?
-	if !tkn.Valid {
-		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
-		fmt.Println("Token Expired")
 		return
 	}
 
@@ -129,31 +121,30 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 	// awardUser can do both the things decrease or increase no of coins.
 	// So it become necessary here to check whether the no of coins
 	// to be awarded is positive or not.
-	if award.Award <= 0{
-		http.Error(w,"No of coins to be awarded must be a positive number",http.StatusBadRequest)
+	if award.Award <= 0 {
+		http.Error(w, "No of coins to be awarded must be a positive number", http.StatusBadRequest)
 		fmt.Println("Non-positive Award Requested. Aborted the process")
 		return
 	}
 
 	err = awardCoin(&award)
-	if(err != nil){
-		http.Error(w,"Unable to Award Coins",http.StatusInternalServerError)
+	if err != nil {
+		http.Error(w, "Unable to Award Coins", http.StatusInternalServerError)
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println(award.Award,"Coins awarded to",award.Rollno)
+	fmt.Println(award.Award, "Coins awarded to", award.Rollno)
 
 	// TODO : Send total coins to user.
-	w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(award)
 }
 
-
 type transferRequest struct {
 	FromRollno int `json:"from"`
-	ToRollno int `json:"to"`
-	Amount  int `json:"amount"`
+	ToRollno   int `json:"to"`
+	Amount     int `json:"amount"`
 }
 
 func transferHandler(w http.ResponseWriter, r *http.Request) {
@@ -163,59 +154,10 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Unsupported Method Name")
 		return
 	}
-	// Verify User
-	// TODO : Create a function which does this authorization
-	// 	  so that we can use it frequently.
-	token, err := r.Cookie("jwt")
 
-	// Error in Cookie extraction
-	if err != nil {
-		if err == http.ErrNoCookie {
-			// No cookie means user is not logged in.
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			fmt.Println(err)
-			return
-		}
-
-		// Other type of Errors
-		http.Error(w, "Unauthorized!", http.StatusBadRequest)
+	if err := checkCookie(w, r); err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		fmt.Println(err)
-		return
-	}
-
-	// token present
-
-	tokenString := token.Value
-
-	// New instance of claims
-	claims := &Claims{}
-
-	// Parse the JWT string and store in `claims`.
-	tkn, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
-		return jwtKey, nil
-	})
-
-	// Problem with token
-	if err != nil {
-		// Signature did not match.
-		if err == jwt.ErrSignatureInvalid {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			fmt.Println(err)
-			return
-		}
-
-		// Unknown Error
-		http.Error(w, "Unauthorized", http.StatusBadRequest)
-		fmt.Println(err)
-		return
-	}
-
-	// Expired
-	// ? Invalid/Expired claims will already throw an error in previous Step
-	// ? Then how can this token become invalid?
-	if !tkn.Valid {
-		http.Error(w, "You need to log in Again!", http.StatusUnauthorized)
-		fmt.Println("Token Expired")
 		return
 	}
 
@@ -231,10 +173,10 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 	Sender := User{
 		Rollno: transfer.FromRollno,
 	}
-	err = validateLogin(&Sender,true)
-	if err!= nil{
+	err = validateLogin(&Sender, true)
+	if err != nil {
 		fmt.Println()
-		http.Error(w,"No such user", http.StatusBadRequest)
+		http.Error(w, "No such user", http.StatusBadRequest)
 		return
 	}
 
@@ -244,34 +186,34 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 
 	// It might happen that the database is busy so
 	// ivalidate the request.
-	err = validateLogin(&Reciever,true)
-	if err!= nil{
+	err = validateLogin(&Reciever, true)
+	if err != nil {
 		fmt.Println()
-		http.Error(w,"No such user", http.StatusBadRequest)
+		http.Error(w, "No such user", http.StatusBadRequest)
 		return
 	}
 
-	if transfer.Amount<= 0{
-		http.Error(w,"No of coins to be transferred must be a positive number",http.StatusBadRequest)
+	if transfer.Amount <= 0 {
+		http.Error(w, "No of coins to be transferred must be a positive number", http.StatusBadRequest)
 		fmt.Println("Non-positive Transfer Requested. Aborted the process")
 		return
 	}
 
-	if transfer.Amount > Sender.Coin{
-		http.Error(w,"Not Enough Amount",http.StatusBadRequest)
+	if transfer.Amount > Sender.Coin {
+		http.Error(w, "Not Enough Amount", http.StatusBadRequest)
 		fmt.Println("Sender do not have enough money")
 		return
 	}
 	err = transferCoin(&transfer)
-	if(err != nil){
-		http.Error(w,"Unable to Award Coins",http.StatusInternalServerError)
+	if err != nil {
+		http.Error(w, "Unable to Award Coins", http.StatusInternalServerError)
 		fmt.Println(err)
 		return
 	}
 
-	fmt.Println(transfer.Amount,"Coins transferred from",transfer.FromRollno, "to", transfer.ToRollno)
+	fmt.Println(transfer.Amount, "Coins transferred from", transfer.FromRollno, "to", transfer.ToRollno)
 
 	// TODO : Send total coins to user.
-	w.Header().Set("Content-Type","application/json")
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(transfer)
 }
