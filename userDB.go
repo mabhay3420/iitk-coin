@@ -109,5 +109,5 @@ func validateLogin(user *User, hasCookie bool) error {
 		return err
 	}
 	//else return proper values
-	return err
+	return nil
 }

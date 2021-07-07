@@ -1,3 +1,17 @@
+// Task
+
+// 1. You have already created coin related endpoints,
+//    now you have to secure them and set relevant permissions.
+//    Make sure all the secure endpoints are accessible only via a valid JWT token,
+//    and also the owner of the JWT token should have permission to do what they doing.
+//    Modify the coin related endpoints such that they comply with the
+//    guidelines given in the project idea. For example, user roles,
+//    tax on transfers, rules on who cannot earn, etc. Just go through
+//    the doc and make sure you have all of them.
+//    You can make your own design choices to implement this.
+
+// 2. Add new tables and maintain history of transactions (transfers and rewards).
+
 package main
 
 import (
@@ -10,44 +24,9 @@ import (
 	// "strconv"
 )
 
-// Task
-
-// 1. Create an endpoint that accepts a POST request and awards coins to a user.
-//    The body will have the rollno of the user and the number of coins to be given.
-
-// 2. Create an endpoint that accepts a POST request to transfer coins between two users.
-//    The body will have the rollnos of the particpating users and the number of coins to transfer.
-
-// 3. Create an endpoint that accepts a GET request and returns the coin balance of a user.
-//    The body will have the roll no of the user.
-
-// Notes
-
-// 1. The server handles API requests concurrently by design.
-//    By no way should your endpoints create or destroy coins when it is not intended.
-//    You need to take care that all the steps of your transactions either complete successfully or don't happen at all.
-
-// 2. Make sure that there is no such possible interleaving between two concurrent transactions that can cause unwanted behavior.
-//    To simulate and test different interleavings you can make use of sleep timers between lines of your code.
-
-// 3. Some of the endpoints that you will be creating would not be for all users but just admins,
-//    but you can ignore that for now. We'll take up permission levels a bit later.
-//    You can keep these APIs public for now i.e. no authorization required.
-
-// 4. Take care of as many edge cases as you can.
-
-// Possible edge cases
-// Award:
-// 1. negative or 0 amount : need to check
-// 2. Does not fit in range of integer : json decode should throw an error ideally : need to check
-// 3. User does not exist : authorization
-
-// transfer
-// 1. Invalid amount : 0 or negative or sender do not enough amount : need to check
-// 2. Sender Unauthorized : authorization
-// 2. Second user does not exist : error while getting user data.
-
-//
+/* GLOBAL VARIABLES*/
+var MAX_COIN int = 100000 // max no of coins a person can hold
+/* GLOBAL VARIABLES*/
 type balanceRequest struct {
 	Rollno int `json:"rollno"`
 }
@@ -75,18 +54,18 @@ func balanceHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := User{ Rollno: balance.Rollno}
-	err = validateLogin(&user,true) // has a cookie
+	user := User{Rollno: balance.Rollno}
+	err = validateLogin(&user, true) // has a cookie
 	if err != nil {
 		// extra sanity check
 		fmt.Println("Invalid id/passoword")
 		http.Error(w, "No such user", http.StatusBadRequest)
 		return
 	}
-	response := Response{ Rollno: user.Rollno, Name: user.Name, Coin: user.Coin}
+	response := Response{Rollno: user.Rollno, Name: user.Name, Coin: user.Coin}
 
-	fmt.Println("Balance of",user.Name,"is",user.Coin)
-	w.Header().Set("Content-Type","application/json")
+	fmt.Println("Balance of", user.Name, "is", user.Coin)
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -127,6 +106,22 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := User{Rollno: award.Rollno}
+	err := validateLogin(&user, true)
+	if err != nil {
+		http.Error(w, "No such user", http.StatusBadRequest)
+		fmt.Println(err)
+		return
+	}
+
+	// * The amount of _coin that a person can hold at any point
+	// * in time will be capped. Thus, the total amount in the
+	// * system at any point is also capped.
+	if award.Award+user.Coin > MAX_COIN {
+		http.Error(w, "Balance limit reached for awardee", http.StatusBadRequest)
+		fmt.Println(user.Name, "is full of coin")
+		return
+	}
 	err = awardCoin(&award)
 	if err != nil {
 		http.Error(w, "Unable to Award Coins", http.StatusInternalServerError)
@@ -145,6 +140,12 @@ type transferRequest struct {
 	FromRollno int `json:"from"`
 	ToRollno   int `json:"to"`
 	Amount     int `json:"amount"`
+}
+
+func sameBatch(firstRollno int, secondRollno int) bool {
+	// Assume UG for now
+	// TODO: more elaborate mechanism
+	return (firstRollno/10000 == secondRollno/10000)
 }
 
 func transferHandler(w http.ResponseWriter, r *http.Request) {
@@ -170,9 +171,7 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//sanity checks
-	Sender := User{
-		Rollno: transfer.FromRollno,
-	}
+	Sender := User{Rollno: transfer.FromRollno}
 	err = validateLogin(&Sender, true)
 	if err != nil {
 		fmt.Println()
@@ -204,6 +203,20 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Sender do not have enough money")
 		return
 	}
+
+	// * The amount of _coin that a person can hold at any point
+	// * in time will be capped. Thus, the total amount in the
+	// * system at any point is also capped.
+
+	// TODO: transfer Amount should be different here
+	// Better check in the database.
+	if transfer.Amount+Reciever.Coin > MAX_COIN {
+		http.Error(w, "Balance limit reached for Reciever", http.StatusBadRequest)
+		fmt.Println(Reciever.Name, "cannot recieve more coins")
+		return
+
+	}
+
 	err = transferCoin(&transfer)
 	if err != nil {
 		http.Error(w, "Unable to Award Coins", http.StatusInternalServerError)

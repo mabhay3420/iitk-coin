@@ -112,6 +112,16 @@ func transferCoin(transfer *transferRequest) error {
 	}
 	defer recieverStatement.Close()
 
+	if sameBatch(transfer.FromRollno, transfer.ToRollno) {
+		// * A transfer between two people will lead
+		// * to destruction of 2% _coin involved in the form of taxes.
+		transfer.Amount = (98 * transfer.Amount) / 100
+	} else {
+		// * Across the batch transfer will cause a
+		// * destruction of 33% of _coin.
+		transfer.Amount = (67 * transfer.Amount) / 100
+	}
+	
 	_, err = recieverStatement.Exec(transfer.Amount, transfer.ToRollno)
 	if err != nil {
 		log.Println("error while updating reciever info")
@@ -129,6 +139,8 @@ func transferCoin(transfer *transferRequest) error {
 	}
 	defer recordStatement.Close()
 
+	// ? What should we record here: real transfer money
+	// ? or after deducting taxes.
 	log.Println(transfer)
 	_, err = recordStatement.Exec(time.Now(), transfer.FromRollno, transfer.ToRollno, transfer.Amount)
 
