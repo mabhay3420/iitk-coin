@@ -3,11 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	// "github.com/dgrijalva/jwt-go"
 	"log"
 	"net/http"
-	// "time"
-	// "strconv"
 )
 
 type dummyResponse struct {
@@ -24,6 +21,7 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dummyData := dummyResponse{"We are so excited to meet you", "invictus"}
+
 	// Status OK
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dummyData)
@@ -34,7 +32,6 @@ func secretHandler(w http.ResponseWriter, r *http.Request) {
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 
-	// TODO : Learn More about Methods
 	// Valid Methods
 	if r.Method != "GET" {
 		http.Error(w, "Method is not Supported.", http.StatusMethodNotAllowed)
@@ -42,6 +39,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 		// Error method does not necessarly close the request. Need to return.
 		return
 	}
+
 	w.WriteHeader(200)
 	fmt.Fprintf(w, "Hii there, Move to either login or signup")
 }

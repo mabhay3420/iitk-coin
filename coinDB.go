@@ -1,25 +1,16 @@
 package main
 
 import (
-	// "database/sql"
-	// "errors"
-	// "fmt"
+	"context"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"time"
-
-	// "os"
-	"context"
-	// Import sqlite3
-	_ "github.com/mattn/go-sqlite3"
-	// "golang.org/x/crypto/bcrypt"
 )
 
 func awardCoin(award *awardRequest) error {
 
-	// Need to complete this thing in one go.
 	ctx := context.Background()
 
-	// ? transactions options
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Println(err)
@@ -57,13 +48,13 @@ func awardCoin(award *awardRequest) error {
 	}
 	defer activityStatement.Close()
 
-	// Roll no are unique so atmax 1 row will
-	// be updated
+	// Roll no are unique so atmax 1 row will be updated
 	_, err = activityStatement.Exec(award.Rollno)
 	if err != nil {
 		log.Println("error while updating student activity")
 		return err
 	}
+
 	// Update award table
 	recordStatement, err := tx.Prepare("INSERT INTO awards ( Time, AwardeeRollno, Amount ) VALUES(?,?,?)")
 	if err != nil {
@@ -72,6 +63,7 @@ func awardCoin(award *awardRequest) error {
 		tx.Rollback()
 		return err
 	}
+
 	defer recordStatement.Close()
 
 	_, err = recordStatement.Exec(time.Now(), award.Rollno, award.Award)
@@ -82,20 +74,14 @@ func awardCoin(award *awardRequest) error {
 		return err
 	}
 
-	// Succesful
-
 	err = tx.Commit()
-	// displayAward()
-
 	return err
 }
 
 func transferCoin(transfer *transferRequest) error {
 
-	// Need to complete this thing in one go.
 	ctx := context.Background()
 
-	// ? transactions options
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Println(err)
@@ -133,36 +119,35 @@ func transferCoin(transfer *transferRequest) error {
 	defer recieverStatement.Close()
 
 	if sameBatch(transfer.FromRollno, transfer.ToRollno) {
-		// * A transfer between two people will lead
-		// * to destruction of 2% _coin involved in the form of taxes.
+		// A transfer between two people will lead
+		// to destruction of 2% _coin involved in the form of taxes.
 		transfer.Amount = (98 * transfer.Amount) / 100
 	} else {
-		// * Across the batch transfer will cause a
-		// * destruction of 33% of _coin.
+		// Across the batch transfer will cause a
+		// destruction of 33% of _coin.
 		transfer.Amount = (67 * transfer.Amount) / 100
 	}
 
 	_, err = recieverStatement.Exec(transfer.Amount, transfer.ToRollno)
 	if err != nil {
 		log.Println("error while updating reciever info")
-
 		tx.Rollback()
 		return err
 	}
+
 	// Update transfer table
 	recordStatement, err := tx.Prepare("INSERT INTO transfers ( Time , SenderRollno ,RecieverRollno , Amount ) VALUES(?,?,?,?)")
 	if err != nil {
 		log.Println("error while preparing record statement of transfer")
-
 		tx.Rollback()
 		return err
 	}
 	defer recordStatement.Close()
 
-	// ? What should we record here: real transfer money
-	// ? or after deducting taxes.
+	// TODO: The amount transferred is more than what has been
+	// TODO: Recorded. A new field name Tax is required in order
+	// TODO: Make this record table more accurate
 	_, err = recordStatement.Exec(time.Now(), transfer.FromRollno, transfer.ToRollno, transfer.Amount)
-
 	if err != nil {
 		log.Println("error while recording the transfer")
 
@@ -170,10 +155,6 @@ func transferCoin(transfer *transferRequest) error {
 		return err
 	}
 
-	// Succesful
-
 	err = tx.Commit()
-	// displayAward()
-
 	return err
 }

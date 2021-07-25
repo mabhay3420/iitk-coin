@@ -41,13 +41,13 @@ func main() {
 	}
 
 	// display current information
-	fmt.Println("===-------User List-------===")
+	fmt.Println("===--------------User List--------------===")
 	displayStudents()
-	fmt.Println("===-------Award History------===")
+	fmt.Println("===--------------Award History-------------===")
 	displayAward()
-	fmt.Println("===-------Transfer History------===")
+	fmt.Println("===--------------Transfer History-------------===")
 	displayTransfer()
-	fmt.Println("===----------Here you go--------===")
+	fmt.Println("===-----------------Here you go---------------===")
 
 	// Start Server
 	startServer()

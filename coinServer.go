@@ -1,27 +1,9 @@
-// Task
-
-// 1. You have already created coin related endpoints,
-//    now you have to secure them and set relevant permissions.
-//    Make sure all the secure endpoints are accessible only via a valid JWT token,
-//    and also the owner of the JWT token should have permission to do what they doing.
-//    Modify the coin related endpoints such that they comply with the
-//    guidelines given in the project idea. For example, user roles,
-//    tax on transfers, rules on who cannot earn, etc. Just go through
-//    the doc and make sure you have all of them.
-//    You can make your own design choices to implement this.
-
-// 2. Add new tables and maintain history of transactions (transfers and rewards).
-
 package main
 
 import (
 	"encoding/json"
 	"fmt"
-	// "github.com/dgrijalva/jwt-go"
-	// "log"
 	"net/http"
-	// "time"
-	// "strconv"
 )
 
 /* GLOBAL VARIABLES*/
@@ -29,8 +11,8 @@ var MAX_COIN int = 100000        // max no of coins a person can hold
 var MIN_ACTIVE int = 5           // minimum no of activites student must be involved in order to transfer/redeem money
 var ADMIN = []int{190058}        // ADMIN list, used when assigning role
 var COUNCIL_CORE = []int{190345} // COUNCIL CORE members
-
 /* GLOBAL VARIABLES*/
+
 type balanceRequest struct {
 	Rollno int `json:"rollno"`
 }
@@ -149,6 +131,7 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(user.Name, "is full of coin")
 		return
 	}
+
 	err = awardCoin(&award)
 	if err != nil {
 		http.Error(w, "Unable to Award Coins", http.StatusInternalServerError)
@@ -159,6 +142,7 @@ func awardHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(award.Award, "Coins awarded to", award.Rollno)
 
 	// TODO : Send total coins to user.
+	
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(award)
 }
@@ -170,8 +154,8 @@ type transferRequest struct {
 }
 
 func sameBatch(firstRollno int, secondRollno int) bool {
-	// Assume UG for now
 	// TODO: more elaborate mechanism
+
 	return (firstRollno/10000 == secondRollno/10000)
 }
 
@@ -192,21 +176,26 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ! Unnecessary lookup : find some better method later.
 	curr_user := User{Rollno: rollno}
+
 	err = validateLogin(&curr_user, true)
 	if err != nil {
 		fmt.Println()
 		http.Error(w, "No such user", http.StatusBadRequest)
 		return
 	}
+
 	// * Authorized
 	var transfer transferRequest
+
 	if err := json.NewDecoder(r.Body).Decode(&transfer); err != nil {
 		http.Error(w, "Invalid Input to the form", http.StatusBadRequest)
 		fmt.Println(err)
 		return
 	}
+
 	//sanity checks
 	Sender := User{Rollno: transfer.FromRollno}
+
 	err = validateLogin(&Sender, true)
 	if err != nil {
 		fmt.Println()
@@ -224,6 +213,7 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "No such user", http.StatusBadRequest)
 		return
 	}
+
 	// CHECK PERMISSION
 	// Most important : Sender must be the one who is logged in
 	if Sender.Rollno != curr_user.Rollno {
@@ -231,18 +221,21 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(curr_user.Rollno, "tried to send from", Sender.Rollno, "Account. Aborted!")
 		return
 	}
+
 	// Sender must participate in more than MIN_ACTIVE activites
 	if Sender.Activity < MIN_ACTIVE {
 		http.Error(w, "You are not eligible to transfer coins, Participate More", http.StatusBadRequest)
 		fmt.Println(Sender.Rollno, "Has participated in only", Sender.Activity, "Activities. Unable to transfer!")
 		return
 	}
+
 	// 1. ADMIN : not allowed in transfers
 	if (Reciever.Role == "ADMIN") || (Sender.Role == "ADMIN") {
 		http.Error(w, "Balance of Admin cannot change in any way", http.StatusBadRequest)
 		fmt.Println("Admin was involved in transfers. Aborted.")
 		return
 	}
+
 	// 2. COUNCIL_CORE : NOT allowed in transfers,
 	// though can redeem coins and can be awarded by admins
 	if (Sender.Role == "COUNCIL_CORE") || (Reciever.Role == "COUNCIL_CORE") {
@@ -263,11 +256,12 @@ func transferHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// * The amount of _coin that a person can hold at any point
-	// * in time will be capped. Thus, the total amount in the
-	// * system at any point is also capped.
+	// The amount of _coin that a person can hold at any point
+	// in time will be capped. Thus, the total amount in the
+	// system at any point is also capped.
 
 	// TODO: transfer Amount should be different here
+
 	// Better check in the database.
 	if transfer.Amount+Reciever.Coin > MAX_COIN {
 		http.Error(w, "Balance limit reached for Reciever", http.StatusBadRequest)
